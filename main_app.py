@@ -1,63 +1,78 @@
 import streamlit as st
 import pandas as pd
 import folium
+import requests
 from streamlit_folium import st_folium
 
-# 1. SETUP & DATA LOADING
-# Replace this with: df = pd.read_csv("your_file.csv")
-# Creating dummy data for demonstration
-data = {
-    'station_id': [1, 2, 3, 4, 5],
-    'lat': [19.4326, 19.4214, 19.4361, 19.4180, 19.4270],
-    'lon': [-99.1332, -99.1633, -99.1500, -99.1700, -99.1400]
-}
-df = pd.DataFrame(data)
+# --- STEP 1: FETCH LIVE DATA ---
+@st.cache_data # This prevents reloading data every time you click a button
+def get_ecobici_data():
+    url = "https://api.citybik.es/v2/networks/ecobici"
+    response = requests.get(url).json()
+    stations = response['network']['stations']
+    
+    # Convert JSON to DataFrame
+    df = pd.DataFrame(stations)
+    # Extract lat/lon from the 'latitude' and 'longitude' keys in the API
+    # The API returns 'name', 'latitude', 'longitude', 'free_bikes', etc.
+    return df
 
-# 2. ROW 1: Title and Caption
-st.title("🚲 Ecobici Station Finder")
-st.caption("Created by [Your Name Here]")
+try:
+    df = get_ecobici_data()
+except Exception as e:
+    st.error(f"Could not connect to Ecobici API: {e}")
+    df = pd.DataFrame() # Fallback
 
-st.divider() # Optional visual separator
+# --- STEP 2: ROW 1 (Title & Name) ---
+st.title("🚲 Live Ecobici Network Map")
+st.caption("Developed by [Your Name] | Data source: CityBikes API & CDMX Open Data")
 
-# 3. ROW 2: Logic and Layout
-# We create two columns. The first number is the width ratio.
+# --- STEP 3: ROW 2 (Controls & Map) ---
 col1, col2 = st.columns([1, 3])
 
 with col1:
-    st.subheader("Controls")
-    # Dropdown menu to select station
-    selected_id = st.selectbox(
-        "Select a Station ID:",
-        options=df['station_id'].unique()
-    )
+    st.subheader("Station Search")
+    # Search by station name instead of just ID for better UX
+    station_names = sorted(df['name'].tolist())
+    selected_name = st.selectbox("Select a station:", station_names)
     
-    st.write(f"Showing details for station **#{selected_id}**")
+    # Get details for the selected station
+    selected_station = df[df['name'] == selected_name].iloc[0]
+    
+    st.metric("Bikes Available", selected_station['free_bikes'])
+    st.metric("Empty Slots", selected_station['empty_slots'])
 
 with col2:
-    # We modify your function slightly to RETURN the map instead of just displaying it
-    def bike_share_system_plot(station_number):
-        # Center map on average coordinates
-        m = folium.Map(location=[df['lat'].mean(), df['lon'].mean()], zoom_start=13)
+    def create_map(current_station):
+        # Center on CDMX
+        m = folium.Map(
+            location=[df['latitude'].mean(), df['longitude'].mean()], 
+            zoom_start=13,
+            tiles="cartodbpositron" # Cleaner map style
+        )
 
-        # Plot all stations (Red)
-        for n in range(len(df)):
-            folium.Marker(
-                location=[df['lat'].iloc[n], df['lon'].iloc[n]],
-                tooltip=f"Station {df['station_id'].iloc[n]}",
-                icon=folium.Icon(color="red"),
+        # Plot ALL stations as small circles to keep the map fast
+        for _, row in df.iterrows():
+            folium.CircleMarker(
+                location=[row['latitude'], row['longitude']],
+                radius=3,
+                color="red",
+                fill=True,
+                fill_color="red",
+                tooltip=row['name']
             ).add_to(m)
 
-        # Filter and highlight selected station (Blue)
-        temp = df[df['station_id'] == station_number]
-        if not temp.empty:
-            folium.Marker(
-                location=[temp['lat'].iloc[0], temp['lon'].iloc[0]],
-                tooltip=f"Selected: {temp['station_id'].iloc[0]}",
-                icon=folium.Icon(color="blue", icon="cloud"),
-            ).add_to(m)
+        # Highlight the SELECTED station with the Blue Cloud Icon
+        folium.Marker(
+            location=[current_station['latitude'], current_station['longitude']],
+            tooltip=f"SELECTED: {current_station['name']}",
+            icon=folium.Icon(color="blue", icon="cloud"),
+            z_index_offset=1000 # Make sure it stays on top
+        ).add_to(m)
         
         return m
 
-    # Call the function and display it in Streamlit
-    my_map = bike_share_system_plot(selected_id)
-    st_folium(my_map, width=700, height=500, returned_objects=[])
+    # Render map
+    if not df.empty:
+        map_object = create_map(selected_station)
+        st_folium(map_object, width=700, height=500)
