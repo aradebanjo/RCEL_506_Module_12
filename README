@@ -1,0 +1,19 @@
+# Ecobici Mexico City: Data Analysis & Visualization
+
+This repository contains a comprehensive analysis of the **Ecobici** public bike-sharing system in Mexico City. The project explores usage patterns, station popularity, and trip durations to provide insights into urban mobility within the city.
+
+## 🚲 About Ecobici
+Ecobici is the automated bike-sharing system in Mexico City, launched in 2010. It has become a vital part of the city's integrated transport system, helping reduce traffic congestion and carbon emissions.
+
+## 📊 Project Features
+- **Data Cleaning:** Scripts to process raw CSV files from the CDMX Open Data portal.
+- **Exploratory Data Analysis (EDA):** Insights into peak usage hours, gender distribution, and user types.
+- **Geospatial Mapping:** Visualization of the most active stations and popular routes using Folium/Geopandas.
+- **Temporal Trends:** Analysis of how bike usage has evolved over months or years.
+
+## 🛠️ Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone [https://github.com/your-username/ecobici-cdmx.git](https://github.com/your-username/ecobici-cdmx.git)
+   cd ecobici-cdmx
